@@ -1,0 +1,32 @@
+[package]
+name = "f746disco-lcd"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = [
+    ".",
+    "common",
+]
+
+[dependencies]
+common = { path = "./common" }
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+embedded-graphics = { version = "0.8", default-features = false }
+panic-halt = "0.2"
+stm32-fmc = { version = "0.3", features = ["sdram"] }
+
+stm32f7xx-hal = { version = "0.8", features = ["stm32f746", "rt"] }
+
+[features]
+diag-led = []
+diag-pins = []
+diag-bkpt = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
