@@ -47,17 +47,6 @@ use cortex_m_rt::entry;
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
-use embedded_graphics::{
-    mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::{Rgb565, RgbColor},
-    prelude::*,
-    text::Text,
-};
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
 use stm32f7xx_hal as hal;
 #[cfg(all(
     not(feature = "diag-led"),
@@ -71,6 +60,7 @@ use hal::{
     prelude::*,
     rcc::{HSEClock, HSEClockMode},
 };
+
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
@@ -103,6 +93,7 @@ const HEIGHT: usize = 272;
     not(feature = "diag-bkpt")
 ))]
 const FB_SIZE: usize = WIDTH * HEIGHT;
+
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
@@ -163,7 +154,6 @@ static mut FB_LAYER1: [u16; FB_SIZE] = [0; FB_SIZE];
 #[entry]
 fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
-
     let rcc = dp.RCC.constrain();
     let _clocks = rcc.cfgr.freeze();
 
@@ -182,7 +172,6 @@ fn main() -> ! {
 #[entry]
 fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
-
     let rcc = dp.RCC.constrain();
     let _clocks = rcc.cfgr.sysclk(216.MHz()).freeze();
 
@@ -196,7 +185,6 @@ fn main() -> ! {
 #[entry]
 fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
-
     let rcc = dp.RCC.constrain();
     let _clocks = rcc.cfgr.sysclk(216.MHz()).freeze();
 
@@ -229,31 +217,87 @@ fn main() -> ! {
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
+fn put_px_rgb565(framebuffer: &mut [u16], x: i32, y: i32, color: u16) {
+    if x < 0 || y < 0 {
+        return;
+    }
+    let (x, y) = (x as usize, y as usize);
+    if x >= WIDTH || y >= HEIGHT {
+        return;
+    }
+    framebuffer[x + WIDTH * y] = color;
+}
+
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+fn glyph_6x10(c: u8) -> [u8; 10] {
+    match c {
+        b' ' => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        b'H' => [0b100001, 0b100001, 0b100001, 0b111111, 0b100001, 0b100001, 0b100001, 0, 0, 0],
+        b'E' => [0b111111, 0b100000, 0b100000, 0b111110, 0b100000, 0b100000, 0b111111, 0, 0, 0],
+        b'L' => [0b100000, 0b100000, 0b100000, 0b100000, 0b100000, 0b100000, 0b111111, 0, 0, 0],
+        b'O' => [0b011110, 0b100001, 0b100001, 0b100001, 0b100001, 0b100001, 0b011110, 0, 0, 0],
+        b'S' => [0b011111, 0b100000, 0b100000, 0b011110, 0b000001, 0b000001, 0b111110, 0, 0, 0],
+        b'T' => [0b111111, 0b001100, 0b001100, 0b001100, 0b001100, 0b001100, 0b001100, 0, 0, 0],
+        b'M' => [0b100001, 0b110011, 0b101101, 0b100001, 0b100001, 0b100001, 0b100001, 0, 0, 0],
+        b'F' => [0b111111, 0b100000, 0b100000, 0b111110, 0b100000, 0b100000, 0b100000, 0, 0, 0],
+        b'2' => [0b011110, 0b100001, 0b000001, 0b000110, 0b011000, 0b100000, 0b111111, 0, 0, 0],
+        b'3' => [0b111110, 0b000001, 0b000001, 0b011110, 0b000001, 0b000001, 0b111110, 0, 0, 0],
+        b'4' => [0b000110, 0b001010, 0b010010, 0b100010, 0b111111, 0b000010, 0b000010, 0, 0, 0],
+        b'6' => [0b011110, 0b100000, 0b100000, 0b111110, 0b100001, 0b100001, 0b011110, 0, 0, 0],
+        b'7' => [0b111111, 0b000001, 0b000010, 0b000100, 0b001000, 0b010000, 0b010000, 0, 0, 0],
+        _ => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    }
+}
+
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+fn draw_text_6x10(framebuffer: &mut [u16], x: i32, y: i32, s: &str, color: u16) {
+    let mut cx = x;
+    for &b in s.as_bytes() {
+        let g = glyph_6x10(b);
+        for (row, bits) in g.iter().enumerate() {
+            for col in 0..6 {
+                if (bits & (1 << (5 - col))) != 0 {
+                    put_px_rgb565(framebuffer, cx + col as i32, y + row as i32, color);
+                }
+            }
+        }
+        cx += 7; // 6px glyph + 1px spacing
+    }
+}
+
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
 #[entry]
 fn main() -> ! {
     let cp = cortex_m::Peripherals::take().unwrap();
     let dp = pac::Peripherals::take().unwrap();
 
-    // Clocks
     let rcc = dp.RCC.constrain();
     let hse = HSEClock::new(25_000_000.Hz(), HSEClockMode::Oscillator);
-    let clocks = rcc
-        .cfgr
-        .hse(hse)
-        .sysclk(216.MHz())
-        .hclk(216.MHz())
-        .freeze();
+    let clocks = rcc.cfgr.hse(hse).sysclk(216.MHz()).hclk(216.MHz()).freeze();
 
     let mut delay = cp.SYST.delay(&clocks);
 
-    // IO
     let gpioe = dp.GPIOE.split();
     let gpiog = dp.GPIOG.split();
     let gpioh = dp.GPIOH.split();
     let gpioi = dp.GPIOI.split();
     let gpioj = dp.GPIOJ.split();
     let gpiok = dp.GPIOK.split();
+
     let mut led = gpioi.pi1.into_push_pull_output();
+
     for _ in 0..10 {
         led.set_high();
         busy_delay(216_000_000 / 8);
@@ -261,71 +305,56 @@ fn main() -> ! {
         busy_delay(216_000_000 / 8);
     }
 
-    // LCD reset: PG6 -> LCD_RST
     let mut lcd_reset = gpiog.pg6.into_push_pull_output();
     lcd_reset.set_low();
     delay.delay_ms(20u16);
     lcd_reset.set_high();
     delay.delay_ms(20u16);
 
-    // LTDC pins
-    gpioe.pe4.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_B0
-    gpiog.pg12.into_alternate::<9>().set_speed(Speed::VeryHigh); // LTCD_B4
-
-    gpioi.pi9.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_VSYNC
-    gpioi.pi10.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_HSYNC
+    gpioe.pe4.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpiog.pg12.into_alternate::<9>().set_speed(Speed::VeryHigh);
+    gpioi.pi9.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioi.pi10.into_alternate::<14>().set_speed(Speed::VeryHigh);
     gpioi.pi13.into_alternate::<14>().set_speed(Speed::VeryHigh);
-    gpioi.pi14.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_CLK
-    gpioi.pi15.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R0
+    gpioi.pi14.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioi.pi15.into_alternate::<14>().set_speed(Speed::VeryHigh);
 
-    gpioj.pj0.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R1
-    gpioj.pj1.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R2
-    gpioj.pj2.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R3
-    gpioj.pj3.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R4
-    gpioj.pj4.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R5
-    gpioj.pj5.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R6
-    gpioj.pj6.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_R7
-    gpioj.pj7.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G0
-    gpioj.pj8.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G1
-    gpioj.pj9.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G2
-    gpioj.pj10.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G3
-    gpioj.pj11.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G4
-    gpioj.pj13.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_B1
-    gpioj.pj14.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_B2
-    gpioj.pj15.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_B3
+    gpioj.pj0.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj1.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj2.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj3.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj4.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj5.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj6.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj7.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj8.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj9.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj10.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj11.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj13.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj14.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpioj.pj15.into_alternate::<14>().set_speed(Speed::VeryHigh);
 
-    gpiok.pk0.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G5
-    gpiok.pk1.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G6
-    gpiok.pk2.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_G7
-    gpiok.pk4.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_B5
-    gpiok.pk5.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_B6
-    gpiok.pk6.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_B7
-    gpiok.pk7.into_alternate::<14>().set_speed(Speed::VeryHigh); // LTCD_DE
+    gpiok.pk0.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpiok.pk1.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpiok.pk2.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpiok.pk4.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpiok.pk5.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpiok.pk6.into_alternate::<14>().set_speed(Speed::VeryHigh);
+    gpiok.pk7.into_alternate::<14>().set_speed(Speed::VeryHigh);
 
-    // HSE osc out in High Z
     gpioh.ph1.into_floating_input();
 
-    // LCD enable: set it low first to avoid LCD bleed while setting up timings
     let mut disp_on = gpioi.pi12.into_push_pull_output();
     disp_on.set_low();
 
-    // LCD backlight enable
     let mut backlight = gpiok.pk3.into_push_pull_output();
     backlight.set_high();
 
     let mut display = Stm32F7DiscoDisplay::new(dp.LTDC, dp.DMA2D, &hse);
-
     let framebuffer = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
-    let bars: [u16; 8] = [
-        WHITE_RGB565,
-        YELLOW_RGB565,
-        CYAN_RGB565,
-        GREEN_RGB565,
-        MAGENTA_RGB565,
-        RED_RGB565,
-        BLUE_RGB565,
-        BLACK_RGB565,
-    ];
+
+    let bars: [u16; 8] = [WHITE_RGB565, YELLOW_RGB565, CYAN_RGB565, GREEN_RGB565, MAGENTA_RGB565, RED_RGB565, BLUE_RGB565, BLACK_RGB565];
     for y in 0..HEIGHT {
         for x in 0..WIDTH {
             let bar = (x * bars.len()) / WIDTH;
@@ -333,20 +362,20 @@ fn main() -> ! {
         }
     }
 
-    display
-        .controller
-        .config_layer(Layer::L1, framebuffer, PixelFormat::RGB565);
-    display.controller.enable_layer(Layer::L1);
-    display.controller.reload();
+    
+disp_on.set_high();
 
-    // LCD enable: activate LCD !
-    disp_on.set_high();
+draw_text_6x10(framebuffer, 21, 41, "HELLO", BLACK_RGB565);
+draw_text_6x10(framebuffer, 21, 61, "STM32F746", BLACK_RGB565);
+draw_text_6x10(framebuffer, 20, 40, "HELLO", MAGENTA_RGB565);
+draw_text_6x10(framebuffer, 20, 60, "STM32F746", MAGENTA_RGB565);
 
-    let style = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
-    Text::new("Hello from SRAM!", Point::new(20, 40), style)
-        .draw(&mut display)
-        .ok();
+display.controller.config_layer(Layer::L1, framebuffer, PixelFormat::RGB565);
+display.controller.enable_layer(Layer::L1);
+display.controller.reload();
 
+display.controller.reload();
+ 
     let mut led_on = false;
     loop {
         if led_on {
