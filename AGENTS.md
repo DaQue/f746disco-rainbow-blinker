@@ -69,6 +69,7 @@ Repo: https://github.com/DaQue/f746disco-rainbow-blinker
 - 🧭 `cal` mode shows a single target crosshair and prints 5 touch points  
 - 👆 Touch buttons tap/hold update the counter  
 - 🧩 main.rs refactored into app/serial/diag modules  
+- 🧱 embedded-graphics wrapper planned for reuse  
 
 ---
 
@@ -152,6 +153,7 @@ Use a project-local runner so `cargo run` flashes instead of trying to execute o
 - `cal` mode steps through five targets and prints touch coords
 - Touch buttons update the counter with tap and hold
 - main.rs logic split into app/serial/diag modules
+- embedded-graphics DrawTarget wrapper planned
 
 ## Notes / Cleanup (optional)
 - `src/screen.rs` has an `unused import: prelude::*` warning; safe to remove later.

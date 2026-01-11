@@ -125,6 +125,12 @@ Exit:
 Status:
 - DONE: hold repeat after delay at a steady rate.
 
+### Step 8 — Embedded-graphics wrapper (optional)
+Goal: add a DrawTarget wrapper over the RGB565 framebuffer for re-use in other projects.
+
+Exit:
+- embedded-graphics draws onto the framebuffer without changing LTDC bring-up.
+
 ## Planned refactor chunks (safe extraction order)
 1) Extract rendering helpers first (lowest risk): `src/render.rs`.
 2) Extract demo logic: `src/demo/` (counter + layout).

@@ -188,6 +188,16 @@ Tasks:
 Exit:
 - Looks good on video, code is understandable.
 
+### Chunk 10 — Embedded-graphics DrawTarget wrapper
+Goal: use embedded-graphics on top of the existing framebuffer without changing the LTDC path.
+Tasks:
+- Add a small DrawTarget wrapper over the RGB565 framebuffer.
+- Keep existing raw render helpers intact; use embedded-graphics only for optional labels/overlays.
+- Provide a tiny demo (e.g., draw a label) behind a feature flag if needed.
+
+Exit:
+- embedded-graphics can draw onto the framebuffer without regressions.
+
 ## Planned refactor chunks (safe extraction order)
 1) Extract rendering helpers first (lowest risk):
    - Create `src/render.rs`
