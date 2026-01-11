@@ -5,7 +5,7 @@ use crate::render::{
     fill_rainbow, fill_round_rect, fill_solid,
 };
 
-pub fn render_counter(framebuffer: &mut [u16], value: i16) {
+pub fn render_counter(framebuffer: &mut [u16], value: i16, pressed: Option<Button>) {
     let mut buf = [0u8; 6];
     let s = format_i16(value, &mut buf);
     let len = s.len() as i32;
@@ -33,52 +33,40 @@ pub fn render_counter(framebuffer: &mut [u16], value: i16) {
 
     let btn_radius = 10;
     let btn_frame = 2;
-    fill_round_rect(
+    let up_pressed = pressed == Some(Button::Up);
+    let down_pressed = pressed == Some(Button::Down);
+    draw_button(
         framebuffer,
         left_x,
         btn_y,
         btn_width,
         btn_height,
         btn_radius,
-        ORANGE_RGB565,
+        btn_frame,
+        up_pressed,
     );
-    fill_round_rect(
-        framebuffer,
-        left_x + btn_frame,
-        btn_y + btn_frame,
-        btn_width - btn_frame * 2,
-        btn_height - btn_frame * 2,
-        (btn_radius - btn_frame).max(0),
-        BLACK_RGB565,
-    );
-    fill_round_rect(
+    draw_button(
         framebuffer,
         right_x,
         btn_y,
         btn_width,
         btn_height,
         btn_radius,
-        ORANGE_RGB565,
-    );
-    fill_round_rect(
-        framebuffer,
-        right_x + btn_frame,
-        btn_y + btn_frame,
-        btn_width - btn_frame * 2,
-        btn_height - btn_frame * 2,
-        (btn_radius - btn_frame).max(0),
-        BLACK_RGB565,
+        btn_frame,
+        down_pressed,
     );
 
     let arrow_size = 12;
     let arrow_offset = (arrow_size - 1) / 2;
     let up_cx = left_x + btn_width / 2;
     let up_cy = btn_y + btn_height / 2 + arrow_offset;
-    draw_triangle_up(framebuffer, up_cx, up_cy, arrow_size, ORANGE_RGB565);
+    let up_color = if up_pressed { BLACK_RGB565 } else { ORANGE_RGB565 };
+    draw_triangle_up(framebuffer, up_cx, up_cy, arrow_size, up_color);
 
     let down_cx = right_x + btn_width / 2;
     let down_cy = btn_y + btn_height / 2 - arrow_offset;
-    draw_triangle_down(framebuffer, down_cx, down_cy, arrow_size, ORANGE_RGB565);
+    let down_color = if down_pressed { BLACK_RGB565 } else { ORANGE_RGB565 };
+    draw_triangle_down(framebuffer, down_cx, down_cy, arrow_size, down_color);
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -103,10 +91,10 @@ pub struct Layout {
 pub fn hit_test(x: i32, y: i32) -> Option<Button> {
     let layout = layout();
     if rect_contains(&layout.left_btn, x, y) {
-        return Some(Button::Down);
+        return Some(Button::Up);
     }
     if rect_contains(&layout.right_btn, x, y) {
-        return Some(Button::Up);
+        return Some(Button::Down);
     }
     None
 }
@@ -148,6 +136,32 @@ fn layout() -> Layout {
 
 fn rect_contains(rect: &Rect, x: i32, y: i32) -> bool {
     x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+}
+
+fn draw_button(
+    framebuffer: &mut [u16],
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    radius: i32,
+    frame: i32,
+    pressed: bool,
+) {
+    if pressed {
+        fill_round_rect(framebuffer, x, y, w, h, radius, ORANGE_RGB565);
+    } else {
+        fill_round_rect(framebuffer, x, y, w, h, radius, ORANGE_RGB565);
+        fill_round_rect(
+            framebuffer,
+            x + frame,
+            y + frame,
+            w - frame * 2,
+            h - frame * 2,
+            (radius - frame).max(0),
+            BLACK_RGB565,
+        );
+    }
 }
 
 pub const CAL_POINT_COUNT: usize = 5;

@@ -46,6 +46,9 @@ This is NOT a rewrite. It is extraction-only.
 Target after first refactor pass:
 - main.rs ~150–220 lines: just init + loop + calls into modules.
 
+Status:
+- DONE: main.rs now ~300 lines with logic split into modules.
+
 ## Work plan (in the correct order)
 
 ### Chunk 0 — Guardrail setup (done)

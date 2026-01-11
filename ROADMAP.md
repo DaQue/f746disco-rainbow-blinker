@@ -130,6 +130,9 @@ Status:
 2) Extract demo logic: `src/demo/` (counter + layout).
 3) Keep LTDC/SDRAM init in `src/main.rs` until platform is stable.
 
+Status:
+- DONE: `src/main.rs` trimmed to ~300 lines with app/serial/diag modules.
+
 ## Verification checklist (run after every chunk)
 - Board boots reliably.
 - LCD is lit and shows expected content.

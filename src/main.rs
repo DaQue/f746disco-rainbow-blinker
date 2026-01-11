@@ -4,29 +4,11 @@
 use panic_halt as _;
 
 #[cfg(feature = "diag-led")]
-#[cfg(feature = "diag-led")]
-use cortex_m_rt::entry;
-#[cfg(feature = "diag-led")]
-use stm32f7xx_hal as hal;
-#[cfg(feature = "diag-led")]
-use hal::{pac, prelude::*};
-
-#[cfg(feature = "diag-bkpt")]
-use cortex_m::asm::{bkpt, delay as busy_delay};
-#[cfg(feature = "diag-bkpt")]
 use cortex_m_rt::entry;
 #[cfg(feature = "diag-bkpt")]
-use stm32f7xx_hal as hal;
-#[cfg(feature = "diag-bkpt")]
-use hal::{pac, prelude::*};
-
-#[cfg(feature = "diag-pins")]
-#[cfg(feature = "diag-pins")]
 use cortex_m_rt::entry;
 #[cfg(feature = "diag-pins")]
-use stm32f7xx_hal as hal;
-#[cfg(feature = "diag-pins")]
-use hal::{pac, prelude::*};
+use cortex_m_rt::entry;
 
 #[cfg(all(
     not(feature = "diag-led"),
@@ -34,12 +16,6 @@ use hal::{pac, prelude::*};
     not(feature = "diag-bkpt")
 ))]
 use core::fmt::Write;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-use nb::Error as NbError;
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
@@ -89,13 +65,7 @@ use crate::screen::Stm32F7DiscoDisplay;
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
-use crate::{
-    demo_counter::{
-        hit_test, render_calibration_screen, render_counter, Button, CAL_POINT_COUNT, CAL_POINTS,
-    },
-    serial_cmd::{handle_serial_command, SerialAction},
-    time::busy_delay_ms,
-};
+use crate::{app::AppState, serial_io::poll_serial, time::busy_delay_ms};
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
@@ -126,6 +96,18 @@ mod serial_cmd;
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
+mod serial_io;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+mod app;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
 mod time;
 #[cfg(all(
     not(feature = "diag-led"),
@@ -139,6 +121,8 @@ mod touch;
     not(feature = "diag-bkpt")
 ))]
 mod demo_counter;
+#[cfg(any(feature = "diag-led", feature = "diag-bkpt", feature = "diag-pins"))]
+mod diag;
 
 #[cfg(all(
     not(feature = "diag-led"),
@@ -157,63 +141,19 @@ static mut FB_LAYER1: [u16; FB_SIZE] = [0; FB_SIZE];
 #[cfg(feature = "diag-led")]
 #[entry]
 fn main() -> ! {
-    let dp = pac::Peripherals::take().unwrap();
-    let rcc = dp.RCC.constrain();
-    let _clocks = rcc.cfgr.freeze();
-
-    let gpioi = dp.GPIOI.split();
-    let mut led = gpioi.pi1.into_push_pull_output();
-
-    loop {
-        led.set_high();
-        busy_delay(8_000_000);
-        led.set_low();
-        busy_delay(8_000_000);
-    }
+    diag::run_led()
 }
 
 #[cfg(feature = "diag-bkpt")]
 #[entry]
 fn main() -> ! {
-    let dp = pac::Peripherals::take().unwrap();
-    let rcc = dp.RCC.constrain();
-    let _clocks = rcc.cfgr.sysclk(216.MHz()).freeze();
-
-    loop {
-        bkpt();
-        busy_delay(216_000_000 / 4);
-    }
+    diag::run_bkpt()
 }
 
 #[cfg(feature = "diag-pins")]
 #[entry]
 fn main() -> ! {
-    let dp = pac::Peripherals::take().unwrap();
-    let rcc = dp.RCC.constrain();
-    let _clocks = rcc.cfgr.sysclk(216.MHz()).freeze();
-
-    let gpiog = dp.GPIOG.split();
-    let gpioi = dp.GPIOI.split();
-    let gpiok = dp.GPIOK.split();
-
-    let mut led = gpioi.pi1.into_push_pull_output();
-    let mut disp_on = gpioi.pi12.into_push_pull_output();
-    let mut backlight = gpiok.pk3.into_push_pull_output();
-    let mut lcd_reset = gpiog.pg6.into_push_pull_output();
-
-    loop {
-        led.set_high();
-        disp_on.set_low();
-        backlight.set_high();
-        lcd_reset.set_low();
-        busy_delay(216_000_000 / 8);
-
-        led.set_low();
-        disp_on.set_high();
-        backlight.set_low();
-        lcd_reset.set_high();
-        busy_delay(216_000_000 / 8);
-    }
+    diag::run_pins()
 }
 
 #[cfg(all(
@@ -332,96 +272,24 @@ fn main() -> ! {
     backlight.set_high();
 
     let mut display = Stm32F7DiscoDisplay::new(dp.LTDC, dp.DMA2D, &hse);
-    let framebuffer = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
+    let fb_ptr = core::ptr::addr_of_mut!(FB_LAYER1);
 
-    let mut counter_value: i16 = 0;
-    let mut last_drawn: i16 = counter_value;
-    let mut cal_mode = false;
-    let mut cal_index: usize = 0;
-    let mut cal_touch_down = false;
-    let mut last_touch: Option<(u16, u16)> = None;
-    let mut cal_points: [Option<(u16, u16)>; CAL_POINT_COUNT] = [None; CAL_POINT_COUNT];
-    let cal_tol: i32 = 30;
-    let mut btn_touch_down = false;
-    let mut held_button: Option<Button> = None;
-    let mut hold_ms: u32 = 0;
-    let mut repeat_ms: u32 = 0;
-    render_counter(framebuffer, counter_value);
-
-    
-disp_on.set_high();
-
-display.controller.config_layer(Layer::L1, framebuffer, PixelFormat::RGB565);
-display.controller.enable_layer(Layer::L1);
-display.controller.reload();
-
-display.controller.reload();
- 
-    let mut led_on = false;
-    let mut led_ms: u32 = 0;
-    let mut alive_ms: u32 = 0;
-    let mut seconds: u32 = 0;
+    let mut app = AppState::new(0);
+    unsafe {
+        app.render_initial(&mut *fb_ptr);
+    }
+    disp_on.set_high();
+    display
+        .controller
+        .config_layer(Layer::L1, unsafe { &mut *fb_ptr }, PixelFormat::RGB565);
+    display.controller.enable_layer(Layer::L1);
+    display.controller.reload();
+    display.controller.reload();
     let mut line_buf = [0u8; 64];
     let mut line_len: usize = 0;
-    let mut rx_idle_ms: u32 = 0;
     loop {
-        loop {
-            match rx.read() {
-                Ok(byte) => {
-                    rx_idle_ms = 0;
-                    if byte == b'\r' || byte == b'\n' {
-                        if line_len > 0 {
-                            if let Ok(line) = core::str::from_utf8(&line_buf[..line_len]) {
-                                if let Some(action) =
-                                    handle_serial_command(line, &mut counter_value, &mut tx)
-                                {
-                                    match action {
-                                        SerialAction::ToggleCal => {
-                                            cal_mode = !cal_mode;
-                                            let _ = write!(
-                                                tx,
-                                                "cal {}\r\n",
-                                                if cal_mode { "on" } else { "off" }
-                                            );
-                                            let fb =
-                                                unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
-                                            if cal_mode {
-                                                cal_index = 0;
-                                                cal_touch_down = false;
-                                                last_touch = None;
-                                                cal_points = [None; CAL_POINT_COUNT];
-                                                btn_touch_down = false;
-                                                render_calibration_screen(fb, cal_index, None);
-                                            } else {
-                                                btn_touch_down = false;
-                                                render_counter(fb, counter_value);
-                                            }
-                                            last_drawn = counter_value;
-                                        }
-                                    }
-                                }
-                            } else {
-                                let _ = write!(tx, "err\r\n");
-                            }
-                            line_len = 0;
-                        }
-                    } else {
-                        let _ = write!(tx, "{}", byte as char);
-                        if line_len < line_buf.len() {
-                            line_buf[line_len] = byte;
-                            line_len += 1;
-                        } else {
-                            line_len = 0;
-                            let _ = write!(tx, "err: overflow\r\n");
-                        }
-                    }
-                }
-                Err(NbError::WouldBlock) => break,
-                Err(_) => {
-                    let _ = write!(tx, "err\r\n");
-                }
-            }
-        }
+        let fb = unsafe { &mut *fb_ptr };
+        poll_serial(&mut rx, &mut tx, &mut app, fb, &mut line_buf, &mut line_len);
 
         let now = DWT::cycle_count();
         let delta = now.wrapping_sub(last_cycle);
@@ -430,149 +298,8 @@ display.controller.reload();
         let elapsed_ms = total / cycles_per_ms;
         cycle_remainder = total % cycles_per_ms;
         busy_delay_ms(cpu_hz, 1);
-        if !cal_mode {
-            let touch_now = touch.read_touch();
-            let is_down = touch_now.is_some();
-            let just_pressed = is_down && !btn_touch_down;
-            let current_button = touch_now.and_then(|(x, y)| hit_test(x as i32, y as i32));
-            if current_button != held_button {
-                held_button = current_button;
-                hold_ms = 0;
-                repeat_ms = 0;
-            }
-            if just_pressed {
-                if let Some(button) = current_button {
-                    match button {
-                        Button::Up => {
-                            if counter_value < 999 {
-                                counter_value += 1;
-                            }
-                        }
-                        Button::Down => {
-                            if counter_value > -999 {
-                                counter_value -= 1;
-                            }
-                        }
-                    }
-                }
-            }
-            if is_down {
-                hold_ms = hold_ms.wrapping_add(elapsed_ms);
-                if hold_ms >= 1333 {
-                    repeat_ms = repeat_ms.wrapping_add(elapsed_ms);
-                    if repeat_ms >= 250 {
-                        if let Some(button) = held_button {
-                            match button {
-                                Button::Up => {
-                                    if counter_value < 999 {
-                                        counter_value += 1;
-                                    }
-                                }
-                                Button::Down => {
-                                    if counter_value > -999 {
-                                        counter_value -= 1;
-                                    }
-                                }
-                            }
-                        }
-                        repeat_ms = 0;
-                    }
-                }
-            } else {
-                held_button = None;
-                hold_ms = 0;
-                repeat_ms = 0;
-            }
-            btn_touch_down = is_down;
-            if counter_value != last_drawn {
-                let fb = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
-                render_counter(fb, counter_value);
-                last_drawn = counter_value;
-            }
-        }
-        if cal_mode {
-            let touch_now = touch.read_touch();
-            let is_down = touch_now.is_some();
-            let was_down = cal_touch_down;
-            let mut redraw = false;
-            if !is_down && was_down {
-                if let Some(pt) = last_touch {
-                    let target = CAL_POINTS[cal_index];
-                    let dx = pt.0 as i32 - target.0;
-                    let dy = pt.1 as i32 - target.1;
-                    if dx.abs() <= cal_tol && dy.abs() <= cal_tol {
-                        cal_points[cal_index] = Some(pt);
-                        let _ = write!(
-                            tx,
-                            "cal {} {} {}\r\n",
-                            cal_index + 1,
-                            pt.0,
-                            pt.1
-                        );
-                        cal_index += 1;
-                    } else {
-                        let _ = write!(
-                            tx,
-                            "cal miss {} {} {} {} {}\r\n",
-                            cal_index + 1,
-                            pt.0,
-                            pt.1,
-                            target.0,
-                            target.1
-                        );
-                    }
-                }
-                if cal_index >= CAL_POINT_COUNT {
-                    cal_mode = false;
-                    let _ = write!(tx, "cal done\r\n");
-                    for (i, entry) in cal_points.iter().enumerate() {
-                        if let Some((x, y)) = entry {
-                            let _ = write!(tx, "cal {} {} {}\r\n", i + 1, x, y);
-                        }
-                    }
-                    let fb = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
-                    render_counter(fb, counter_value);
-                    last_drawn = counter_value;
-                    last_touch = None;
-                    cal_touch_down = false;
-                    continue;
-                }
-                redraw = true;
-            }
-            if touch_now != last_touch {
-                match touch_now {
-                    Some((x, y)) => {
-                        let _ = write!(tx, "touch {} {}\r\n", x, y);
-                    }
-                    None => {
-                        let _ = write!(tx, "touch up\r\n");
-                    }
-                }
-                redraw = true;
-            }
-            if redraw {
-                let fb = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
-                render_calibration_screen(fb, cal_index, touch_now);
-            }
-            cal_touch_down = is_down;
-            last_touch = touch_now;
-        }
-        led_ms = led_ms.wrapping_add(elapsed_ms);
-        rx_idle_ms = rx_idle_ms.wrapping_add(elapsed_ms);
-        alive_ms = alive_ms.wrapping_add(elapsed_ms);
-        if led_ms >= 500 {
-            led_ms = led_ms.wrapping_sub(500);
-            if led_on {
-                led.set_low();
-            } else {
-                led.set_high();
-            }
-            led_on = !led_on;
-        }
-        if !cal_mode && alive_ms >= 1000 && rx_idle_ms >= 3000 {
-            alive_ms = alive_ms.wrapping_sub(1000);
-            seconds = seconds.wrapping_add(1);
-            let _ = write!(tx, "alive t={}\r\n", seconds);
-        }
+        let fb = unsafe { &mut *fb_ptr };
+        app.update(touch.read_touch(), elapsed_ms, &mut tx, fb);
+        app.tick(elapsed_ms, &mut led, &mut tx);
     }
 }
