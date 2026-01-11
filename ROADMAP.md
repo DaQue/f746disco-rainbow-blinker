@@ -45,7 +45,7 @@ Goal: prove you can print reliably (no blocking, no LCD changes).
 Do:
 - Initialize USART/VCP printing (ST-LINK VCP).
 - Print once at boot: `boot ok`.
-- Optional: heartbeat every 1s: `alive t=...`.
+- Optional: heartbeat ~1s: `alive t=...` (idle-gated).
 
 Exit:
 - `boot ok` appears on every reset/flash in minicom/screen.
@@ -53,6 +53,7 @@ Exit:
 
 Status:
 - DONE: `boot ok` and `alive t=...` verified in minicom (ST-LINK VCP / USART1).
+- Current behavior: `alive` runs continuously but pauses for 3s after RX activity.
 
 ### Step 2 — Serial Phase 2: read + write
 Goal: accept simple commands and echo responses (still no UI dependence).

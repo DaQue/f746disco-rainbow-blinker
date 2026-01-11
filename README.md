@@ -25,5 +25,8 @@ Commands (case-insensitive):
 - `dec`
 - `help`
 
+Alive output:
+- `alive t=...` prints ~1Hz when idle, pauses for ~3s after RX activity.
+
 ## Notes
 - LCD bring-up order is sensitive; see `ROADMAP.md` for guardrails.

@@ -80,6 +80,16 @@ use hal::{
     not(feature = "diag-bkpt")
 ))]
 use crate::screen::Stm32F7DiscoDisplay;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+use crate::{
+    render::{draw_text_6x10, fill_rainbow},
+    serial_cmd::handle_serial_command,
+    time::busy_delay_ms,
+};
 
 #[cfg(all(
     not(feature = "diag-led"),
@@ -87,74 +97,31 @@ use crate::screen::Stm32F7DiscoDisplay;
     not(feature = "diag-bkpt")
 ))]
 mod screen;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+mod render;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+mod serial_cmd;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+mod time;
 
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
-const WIDTH: usize = 480;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const HEIGHT: usize = 272;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const FB_SIZE: usize = WIDTH * HEIGHT;
-
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const WHITE_RGB565: u16 = 0xFFFF;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const YELLOW_RGB565: u16 = 0xFFE0;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const CYAN_RGB565: u16 = 0x07FF;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const GREEN_RGB565: u16 = 0x07E0;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const MAGENTA_RGB565: u16 = 0xF81F;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const RED_RGB565: u16 = 0xF800;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const BLUE_RGB565: u16 = 0x001F;
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-const BLACK_RGB565: u16 = 0x0000;
+use common::{BLACK_RGB565, FB_SIZE, MAGENTA_RGB565};
 
 #[cfg(all(
     not(feature = "diag-led"),
@@ -222,135 +189,6 @@ fn main() -> ! {
         backlight.set_low();
         lcd_reset.set_high();
         busy_delay(216_000_000 / 8);
-    }
-}
-
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-fn put_px_rgb565(framebuffer: &mut [u16], x: i32, y: i32, color: u16) {
-    if x < 0 || y < 0 {
-        return;
-    }
-    let (x, y) = (x as usize, y as usize);
-    if x >= WIDTH || y >= HEIGHT {
-        return;
-    }
-    framebuffer[x + WIDTH * y] = color;
-}
-
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-fn glyph_6x10(c: u8) -> [u8; 10] {
-    match c {
-        b' ' => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        b'H' => [0b100001, 0b100001, 0b100001, 0b111111, 0b100001, 0b100001, 0b100001, 0, 0, 0],
-        b'E' => [0b111111, 0b100000, 0b100000, 0b111110, 0b100000, 0b100000, 0b111111, 0, 0, 0],
-        b'L' => [0b100000, 0b100000, 0b100000, 0b100000, 0b100000, 0b100000, 0b111111, 0, 0, 0],
-        b'O' => [0b011110, 0b100001, 0b100001, 0b100001, 0b100001, 0b100001, 0b011110, 0, 0, 0],
-        b'S' => [0b011111, 0b100000, 0b100000, 0b011110, 0b000001, 0b000001, 0b111110, 0, 0, 0],
-        b'T' => [0b111111, 0b001100, 0b001100, 0b001100, 0b001100, 0b001100, 0b001100, 0, 0, 0],
-        b'M' => [0b100001, 0b110011, 0b101101, 0b100001, 0b100001, 0b100001, 0b100001, 0, 0, 0],
-        b'F' => [0b111111, 0b100000, 0b100000, 0b111110, 0b100000, 0b100000, 0b100000, 0, 0, 0],
-        b'2' => [0b011110, 0b100001, 0b000001, 0b000110, 0b011000, 0b100000, 0b111111, 0, 0, 0],
-        b'3' => [0b111110, 0b000001, 0b000001, 0b011110, 0b000001, 0b000001, 0b111110, 0, 0, 0],
-        b'4' => [0b000110, 0b001010, 0b010010, 0b100010, 0b111111, 0b000010, 0b000010, 0, 0, 0],
-        b'6' => [0b011110, 0b100000, 0b100000, 0b111110, 0b100001, 0b100001, 0b011110, 0, 0, 0],
-        b'7' => [0b111111, 0b000001, 0b000010, 0b000100, 0b001000, 0b010000, 0b010000, 0, 0, 0],
-        _ => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    }
-}
-
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-fn draw_text_6x10(framebuffer: &mut [u16], x: i32, y: i32, s: &str, color: u16) {
-    let mut cx = x;
-    for &b in s.as_bytes() {
-        let g = glyph_6x10(b);
-        for (row, bits) in g.iter().enumerate() {
-            for col in 0..6 {
-                if (bits & (1 << (5 - col))) != 0 {
-                    put_px_rgb565(framebuffer, cx + col as i32, y + row as i32, color);
-                }
-            }
-        }
-        cx += 7; // 6px glyph + 1px spacing
-    }
-}
-
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-fn busy_delay_ms(cpu_hz: u32, ms: u32) {
-    let cycles = (cpu_hz as u64 * ms as u64) / 1000;
-    let cycles = cycles.max(1) as u32;
-    busy_delay(cycles);
-}
-
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-fn clamp_counter(value: i16) -> i16 {
-    if value > 999 {
-        999
-    } else if value < -999 {
-        -999
-    } else {
-        value
-    }
-}
-
-#[cfg(all(
-    not(feature = "diag-led"),
-    not(feature = "diag-pins"),
-    not(feature = "diag-bkpt")
-))]
-fn handle_serial_command(line: &str, value: &mut i16, tx: &mut impl core::fmt::Write) {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-        return;
-    }
-
-    if trimmed.eq_ignore_ascii_case("get") {
-        let _ = write!(tx, "{}\r\n", *value);
-    } else if trimmed.eq_ignore_ascii_case("inc") {
-        *value = clamp_counter(value.wrapping_add(1));
-        let _ = write!(tx, "{}\r\n", *value);
-    } else if trimmed.eq_ignore_ascii_case("dec") {
-        *value = clamp_counter(value.wrapping_sub(1));
-        let _ = write!(tx, "{}\r\n", *value);
-    } else if trimmed.eq_ignore_ascii_case("help") {
-        let _ = write!(
-            tx,
-            "get\r\nset N\r\ninc\r\ndec\r\nhelp\r\n"
-        );
-    } else if trimmed.len() >= 3
-        && trimmed.as_bytes()[..3].eq_ignore_ascii_case(b"set")
-    {
-        let arg = trimmed.get(3..).unwrap_or("").trim();
-        match arg.parse::<i16>() {
-            Ok(parsed) => {
-                *value = clamp_counter(parsed);
-                let _ = write!(tx, "{}\r\n", *value);
-            }
-            Err(_) => {
-                let _ = write!(tx, "err\r\n");
-            }
-        }
-    } else {
-        let _ = write!(tx, "err\r\n");
     }
 }
 
@@ -444,13 +282,7 @@ fn main() -> ! {
     let mut display = Stm32F7DiscoDisplay::new(dp.LTDC, dp.DMA2D, &hse);
     let framebuffer = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
 
-    let bars: [u16; 8] = [WHITE_RGB565, YELLOW_RGB565, CYAN_RGB565, GREEN_RGB565, MAGENTA_RGB565, RED_RGB565, BLUE_RGB565, BLACK_RGB565];
-    for y in 0..HEIGHT {
-        for x in 0..WIDTH {
-            let bar = (x * bars.len()) / WIDTH;
-            framebuffer[x + WIDTH * y] = bars[bar];
-        }
-    }
+    fill_rainbow(framebuffer);
 
     
 disp_on.set_high();
@@ -516,7 +348,7 @@ display.controller.reload();
             }
             led_on = !led_on;
         }
-        if half_sec_ticks % 1000 == 0 && rx_idle_ticks >= 1000 && seconds < 60 {
+        if half_sec_ticks % 2000 == 0 && rx_idle_ticks >= 3000 {
             seconds = seconds.wrapping_add(1);
             let _ = write!(tx, "alive t={}\r\n", seconds);
         }
