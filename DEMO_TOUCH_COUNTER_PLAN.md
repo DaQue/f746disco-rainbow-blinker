@@ -15,7 +15,7 @@ Baseline: LTDC+SDRAM+RGB565 framebuffer working; rainbow test; shadowed text; gr
 - We created a working branch:
   - `git checkout -b demo-touch-counter`
 - main.rs is ~389 lines. That’s the right time for a *surgical* refactor (extraction only).
-- Counter UI now renders: rainbow background, black bar with orange digits, black-filled buttons with orange outlines/arrows.
+- Counter UI now renders: rainbow background, black rounded box with orange digits, black rounded buttons with orange outlines/arrows.
 
 ## Demo goal: "Touch Counter"
 UI:

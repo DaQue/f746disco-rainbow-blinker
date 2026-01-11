@@ -211,7 +211,6 @@ fn main() -> ! {
     let rcc = dp.RCC.constrain();
     let hse = HSEClock::new(25_000_000.Hz(), HSEClockMode::Oscillator);
     let clocks = rcc.cfgr.hse(hse).sysclk(216.MHz()).hclk(216.MHz()).freeze();
-    let cpu_hz = clocks.sysclk().raw();
 
     let mut delay = cp.SYST.delay(&clocks);
 
@@ -230,6 +229,14 @@ fn main() -> ! {
     let rx = gpiob.pb7.into_alternate::<7>();
     let serial = Serial::new(dp.USART1, (tx, rx), &clocks, Config::default());
     let (mut tx, mut rx) = serial.split();
+    let sws = unsafe { &*pac::RCC::ptr() }.cfgr.read().sws().bits();
+    let cpu_hz = match sws {
+        0 => 16_000_000,
+        1 => 25_000_000,
+        2 => clocks.sysclk().raw(),
+        _ => clocks.sysclk().raw(),
+    };
+    let _ = write!(tx, "clk sws={} hz={}\r\n", sws, cpu_hz);
     let _ = write!(tx, "boot ok\r\n");
 
     for _ in 0..10 {
@@ -356,7 +363,7 @@ display.controller.reload();
             }
             led_on = !led_on;
         }
-        if half_sec_ticks % 1000 == 0 && rx_idle_ticks >= 3000 {
+        if half_sec_ticks % 2000 == 0 && rx_idle_ticks >= 6000 {
             seconds = seconds.wrapping_add(1);
             let _ = write!(tx, "alive t={}\r\n", seconds);
         }

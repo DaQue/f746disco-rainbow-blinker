@@ -63,8 +63,8 @@ Repo: https://github.com/DaQue/f746disco-rainbow-blinker
 
 ## Current expected behavior
 
-- 🌈 Rainbow background with centered counter in a black bar  
-- 🟧 Black-filled buttons with orange outlines and ▲/▼  
+- 🌈 Rainbow background with centered counter in a black rounded box  
+- 🟧 Black rounded buttons with orange outlines and ▲/▼  
 - 💚 Green LED blinking continuously  
 
 ---
@@ -143,8 +143,8 @@ Use a project-local runner so `cargo run` flashes instead of trying to execute o
   then hand framebuffer to LTDC.
 
 ## Current Behavior (expected)
-- Rainbow background with centered counter in a black bar
-- Black-filled buttons with orange outlines and ▲/▼
+- Rainbow background with centered counter in a black rounded box
+- Black rounded buttons with orange outlines and ▲/▼
 - Green LED blinking continuously
 
 ## Notes / Cleanup (optional)

@@ -29,8 +29,8 @@
    - Fix: paste smaller chunks or edit directly in editor.
 
 ## Current expected behavior
-- Rainbow background with centered counter in a black bar.
-- Black-filled buttons below with orange outlines and ▲/▼.
+- Rainbow background with centered counter in a black rounded box sized to the buttons.
+- Black rounded buttons below with orange outlines and ▲/▼.
 - Green LED blinking continuously.
 
 ## Notes / cleanup

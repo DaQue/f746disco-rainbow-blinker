@@ -1,6 +1,6 @@
 use common::{
-    BLACK_RGB565, BLUE_RGB565, CYAN_RGB565, GREEN_RGB565, HEIGHT, MAGENTA_RGB565, RED_RGB565,
-    WHITE_RGB565, WIDTH, YELLOW_RGB565,
+    BLACK_RGB565, BLUE_RGB565, CYAN_RGB565, GREEN_RGB565, HEIGHT, MAGENTA_RGB565, ORANGE_RGB565,
+    RED_RGB565, WHITE_RGB565, WIDTH, YELLOW_RGB565,
 };
 
 pub fn put_px_rgb565(framebuffer: &mut [u16], x: i32, y: i32, color: u16) {
@@ -92,7 +92,7 @@ pub fn fill_rainbow(framebuffer: &mut [u16]) {
         MAGENTA_RGB565,
         RED_RGB565,
         BLUE_RGB565,
-        BLACK_RGB565,
+        ORANGE_RGB565,
     ];
     for y in 0..HEIGHT {
         for x in 0..WIDTH {
@@ -116,6 +116,43 @@ pub fn fill_rect(framebuffer: &mut [u16], x: i32, y: i32, w: i32, h: i32, color:
     }
 }
 
+pub fn fill_round_rect(
+    framebuffer: &mut [u16],
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    r: i32,
+    color: u16,
+) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let r = r.max(0).min(w / 2).min(h / 2);
+    if r == 0 {
+        fill_rect(framebuffer, x, y, w, h, color);
+        return;
+    }
+
+    fill_rect(framebuffer, x + r, y, w - 2 * r, h, color);
+    fill_rect(framebuffer, x, y + r, r, h - 2 * r, color);
+    fill_rect(framebuffer, x + w - r, y + r, r, h - 2 * r, color);
+
+    let rr = r * r;
+    for dy in 0..r {
+        for dx in 0..r {
+            if dx * dx + dy * dy <= rr {
+                let rx = r - 1 - dx;
+                let ry = r - 1 - dy;
+                put_px_rgb565(framebuffer, x + rx, y + ry, color);
+                put_px_rgb565(framebuffer, x + w - r + dx, y + ry, color);
+                put_px_rgb565(framebuffer, x + rx, y + h - r + dy, color);
+                put_px_rgb565(framebuffer, x + w - r + dx, y + h - r + dy, color);
+            }
+        }
+    }
+}
+
 pub fn draw_rect_outline(framebuffer: &mut [u16], x: i32, y: i32, w: i32, h: i32, color: u16) {
     for dx in 0..w {
         put_px_rgb565(framebuffer, x + dx, y, color);
@@ -124,6 +161,48 @@ pub fn draw_rect_outline(framebuffer: &mut [u16], x: i32, y: i32, w: i32, h: i32
     for dy in 0..h {
         put_px_rgb565(framebuffer, x, y + dy, color);
         put_px_rgb565(framebuffer, x + w - 1, y + dy, color);
+    }
+}
+
+pub fn draw_round_rect_outline(
+    framebuffer: &mut [u16],
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    r: i32,
+    color: u16,
+) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let r = r.max(0).min(w / 2).min(h / 2);
+    if r == 0 {
+        draw_rect_outline(framebuffer, x, y, w, h, color);
+        return;
+    }
+
+    for dx in r..(w - r) {
+        put_px_rgb565(framebuffer, x + dx, y, color);
+        put_px_rgb565(framebuffer, x + dx, y + h - 1, color);
+    }
+    for dy in r..(h - r) {
+        put_px_rgb565(framebuffer, x, y + dy, color);
+        put_px_rgb565(framebuffer, x + w - 1, y + dy, color);
+    }
+
+    let rr = r * r;
+    for dy in 0..r {
+        for dx in 0..r {
+            if dx * dx + dy * dy <= rr {
+                let rx = r - 1 - dx;
+                let ry = r - 1 - dy;
+                put_px_rgb565(framebuffer, x + rx, y + ry, color);
+                put_px_rgb565(framebuffer, x + w - r + dx, y + ry, color);
+                put_px_rgb565(framebuffer, x + rx, y + h - r + dy, color);
+                put_px_rgb565(framebuffer, x + w - r + dx, y + h - r + dy, color);
+            }
+        }
     }
 }
 
