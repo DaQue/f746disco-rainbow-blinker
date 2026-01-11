@@ -35,6 +35,18 @@ use hal::{pac, prelude::*};
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
+use core::fmt::Write;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+use nb::Error as NbError;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
 use cortex_m::asm::delay as busy_delay;
 #[cfg(all(
     not(feature = "diag-led"),
@@ -59,6 +71,7 @@ use hal::{
     pac,
     prelude::*,
     rcc::{HSEClock, HSEClockMode},
+    serial::{Config, Serial},
 };
 
 #[cfg(all(
@@ -278,6 +291,74 @@ fn draw_text_6x10(framebuffer: &mut [u16], x: i32, y: i32, s: &str, color: u16) 
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
+fn busy_delay_ms(cpu_hz: u32, ms: u32) {
+    let cycles = (cpu_hz as u64 * ms as u64) / 1000;
+    let cycles = cycles.max(1) as u32;
+    busy_delay(cycles);
+}
+
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+fn clamp_counter(value: i16) -> i16 {
+    if value > 999 {
+        999
+    } else if value < -999 {
+        -999
+    } else {
+        value
+    }
+}
+
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+fn handle_serial_command(line: &str, value: &mut i16, tx: &mut impl core::fmt::Write) {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+
+    if trimmed.eq_ignore_ascii_case("get") {
+        let _ = write!(tx, "{}\r\n", *value);
+    } else if trimmed.eq_ignore_ascii_case("inc") {
+        *value = clamp_counter(value.wrapping_add(1));
+        let _ = write!(tx, "{}\r\n", *value);
+    } else if trimmed.eq_ignore_ascii_case("dec") {
+        *value = clamp_counter(value.wrapping_sub(1));
+        let _ = write!(tx, "{}\r\n", *value);
+    } else if trimmed.eq_ignore_ascii_case("help") {
+        let _ = write!(
+            tx,
+            "get\r\nset N\r\ninc\r\ndec\r\nhelp\r\n"
+        );
+    } else if trimmed.len() >= 3
+        && trimmed.as_bytes()[..3].eq_ignore_ascii_case(b"set")
+    {
+        let arg = trimmed.get(3..).unwrap_or("").trim();
+        match arg.parse::<i16>() {
+            Ok(parsed) => {
+                *value = clamp_counter(parsed);
+                let _ = write!(tx, "{}\r\n", *value);
+            }
+            Err(_) => {
+                let _ = write!(tx, "err\r\n");
+            }
+        }
+    } else {
+        let _ = write!(tx, "err\r\n");
+    }
+}
+
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
 #[entry]
 fn main() -> ! {
     let cp = cortex_m::Peripherals::take().unwrap();
@@ -286,9 +367,12 @@ fn main() -> ! {
     let rcc = dp.RCC.constrain();
     let hse = HSEClock::new(25_000_000.Hz(), HSEClockMode::Oscillator);
     let clocks = rcc.cfgr.hse(hse).sysclk(216.MHz()).hclk(216.MHz()).freeze();
+    let cpu_hz = clocks.sysclk().raw();
 
     let mut delay = cp.SYST.delay(&clocks);
 
+    let gpioa = dp.GPIOA.split();
+    let gpiob = dp.GPIOB.split();
     let gpioe = dp.GPIOE.split();
     let gpiog = dp.GPIOG.split();
     let gpioh = dp.GPIOH.split();
@@ -298,11 +382,17 @@ fn main() -> ! {
 
     let mut led = gpioi.pi1.into_push_pull_output();
 
+    let tx = gpioa.pa9.into_alternate::<7>();
+    let rx = gpiob.pb7.into_alternate::<7>();
+    let serial = Serial::new(dp.USART1, (tx, rx), &clocks, Config::default());
+    let (mut tx, mut rx) = serial.split();
+    let _ = write!(tx, "boot ok\r\n");
+
     for _ in 0..10 {
         led.set_high();
-        busy_delay(216_000_000 / 8);
+        busy_delay_ms(cpu_hz, 125);
         led.set_low();
-        busy_delay(216_000_000 / 8);
+        busy_delay_ms(cpu_hz, 125);
     }
 
     let mut lcd_reset = gpiog.pg6.into_push_pull_output();
@@ -377,13 +467,58 @@ display.controller.reload();
 display.controller.reload();
  
     let mut led_on = false;
+    let mut half_sec_ticks: u32 = 0;
+    let mut seconds: u32 = 0;
+    let mut counter_value: i16 = 0;
+    let mut line_buf = [0u8; 64];
+    let mut line_len: usize = 0;
+    let mut rx_idle_ticks: u32 = 0;
     loop {
-        if led_on {
-            led.set_low();
-        } else {
-            led.set_high();
+        loop {
+            match rx.read() {
+                Ok(byte) => {
+                    rx_idle_ticks = 0;
+                    if byte == b'\r' || byte == b'\n' {
+                        if line_len > 0 {
+                            if let Ok(line) = core::str::from_utf8(&line_buf[..line_len]) {
+                                handle_serial_command(line, &mut counter_value, &mut tx);
+                            } else {
+                                let _ = write!(tx, "err\r\n");
+                            }
+                            line_len = 0;
+                        }
+                    } else {
+                        let _ = write!(tx, "{}", byte as char);
+                        if line_len < line_buf.len() {
+                            line_buf[line_len] = byte;
+                            line_len += 1;
+                        } else {
+                            line_len = 0;
+                            let _ = write!(tx, "err: overflow\r\n");
+                        }
+                    }
+                }
+                Err(NbError::WouldBlock) => break,
+                Err(_) => {
+                    let _ = write!(tx, "err\r\n");
+                }
+            }
         }
-        led_on = !led_on;
-        busy_delay(216_000_000 / 4);
+
+        busy_delay_ms(cpu_hz, 1);
+        half_sec_ticks = half_sec_ticks.wrapping_add(1);
+        rx_idle_ticks = rx_idle_ticks.wrapping_add(1);
+        if half_sec_ticks % 500 == 0 {
+            if led_on {
+                led.set_low();
+            } else {
+                led.set_high();
+            }
+            led_on = !led_on;
+        }
+        if half_sec_ticks % 1000 == 0 && rx_idle_ticks >= 1000 && seconds < 60 {
+            seconds = seconds.wrapping_add(1);
+            let _ = write!(tx, "alive t={}\r\n", seconds);
+        }
     }
 }

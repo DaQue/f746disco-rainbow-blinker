@@ -1,12 +1,12 @@
 use embedded_graphics::{
     pixelcolor::{Rgb565, RgbColor},
-    prelude::*,
+    prelude::{DrawTarget, OriginDimensions, Size},
+    Pixel,
 };
 
 use stm32f7xx_hal::{
     ltdc::{DisplayConfig, DisplayController, Layer, PixelFormat},
     pac::{DMA2D, LTDC},
-    prelude::*,
     rcc::HSEClock,
 };
 

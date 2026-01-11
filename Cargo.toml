@@ -14,6 +14,7 @@ common = { path = "./common" }
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
 embedded-graphics = { version = "0.8", default-features = false }
+nb = "1"
 panic-halt = "0.2"
 stm32-fmc = { version = "0.3", features = ["sdram"] }
 
@@ -29,4 +30,3 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
-
