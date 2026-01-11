@@ -104,6 +104,9 @@ Goal: draw a dot/crosshair under your finger; fix axis/inversion mapping.
 Exit:
 - Touch coordinates match the screen.
 
+Status:
+- DONE: `cal` mode shows a single target per step and prints 5 touch coordinates.
+
 ### Step 6 — Tap buttons (edge-detected)
 Goal: tap UP increments once; tap DOWN decrements once (no repeats yet).
 

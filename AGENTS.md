@@ -66,6 +66,7 @@ Repo: https://github.com/DaQue/f746disco-rainbow-blinker
 - 🌈 Rainbow background with centered counter in a black rounded box  
 - 🟧 Black rounded buttons with orange outlines and ▲/▼  
 - 💚 Green LED blinking continuously  
+- 🧭 `cal` mode shows a single target crosshair and prints 5 touch points  
 
 ---
 
@@ -146,6 +147,7 @@ Use a project-local runner so `cargo run` flashes instead of trying to execute o
 - Rainbow background with centered counter in a black rounded box
 - Black rounded buttons with orange outlines and ▲/▼
 - Green LED blinking continuously
+- `cal` mode steps through five targets and prints touch coords
 
 ## Notes / Cleanup (optional)
 - `src/screen.rs` has an `unused import: prelude::*` warning; safe to remove later.

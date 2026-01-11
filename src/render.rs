@@ -1,6 +1,6 @@
 use common::{
-    BLACK_RGB565, BLUE_RGB565, CYAN_RGB565, GREEN_RGB565, HEIGHT, MAGENTA_RGB565, ORANGE_RGB565,
-    RED_RGB565, WHITE_RGB565, WIDTH, YELLOW_RGB565,
+    BLUE_RGB565, CYAN_RGB565, GREEN_RGB565, HEIGHT, MAGENTA_RGB565, ORANGE_RGB565, RED_RGB565,
+    WHITE_RGB565, WIDTH, YELLOW_RGB565,
 };
 
 pub fn put_px_rgb565(framebuffer: &mut [u16], x: i32, y: i32, color: u16) {
@@ -55,6 +55,7 @@ pub fn draw_text_6x10(framebuffer: &mut [u16], x: i32, y: i32, s: &str, color: u
     }
 }
 
+#[allow(dead_code)]
 pub fn draw_text_6x10_scaled(
     framebuffer: &mut [u16],
     x: i32,
@@ -153,6 +154,7 @@ pub fn fill_round_rect(
     }
 }
 
+#[allow(dead_code)]
 pub fn draw_rect_outline(framebuffer: &mut [u16], x: i32, y: i32, w: i32, h: i32, color: u16) {
     for dx in 0..w {
         put_px_rgb565(framebuffer, x + dx, y, color);
@@ -164,6 +166,7 @@ pub fn draw_rect_outline(framebuffer: &mut [u16], x: i32, y: i32, w: i32, h: i32
     }
 }
 
+#[allow(dead_code)]
 pub fn draw_round_rect_outline(
     framebuffer: &mut [u16],
     x: i32,
@@ -222,6 +225,17 @@ pub fn draw_triangle_down(framebuffer: &mut [u16], cx: i32, cy: i32, size: i32, 
             put_px_rgb565(framebuffer, cx + dx, cy + row, color);
         }
     }
+}
+
+pub fn draw_crosshair(framebuffer: &mut [u16], cx: i32, cy: i32, size: i32, color: u16) {
+    let half = size / 2;
+    for dx in -half..=half {
+        put_px_rgb565(framebuffer, cx + dx, cy, color);
+    }
+    for dy in -half..=half {
+        put_px_rgb565(framebuffer, cx, cy + dy, color);
+    }
+    put_px_rgb565(framebuffer, cx, cy, color);
 }
 
 pub fn draw_text_16x24(framebuffer: &mut [u16], x: i32, y: i32, s: &str, color: u16) {

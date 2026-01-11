@@ -1,7 +1,15 @@
-pub fn handle_serial_command(line: &str, value: &mut i16, tx: &mut impl core::fmt::Write) {
+pub enum SerialAction {
+    ToggleCal,
+}
+
+pub fn handle_serial_command(
+    line: &str,
+    value: &mut i16,
+    tx: &mut impl core::fmt::Write,
+) -> Option<SerialAction> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
-        return;
+        return None;
     }
 
     if trimmed.eq_ignore_ascii_case("get") {
@@ -12,10 +20,12 @@ pub fn handle_serial_command(line: &str, value: &mut i16, tx: &mut impl core::fm
     } else if trimmed.eq_ignore_ascii_case("dec") {
         *value = clamp_counter(value.wrapping_sub(1));
         let _ = write!(tx, "{}\r\n", *value);
+    } else if trimmed.eq_ignore_ascii_case("cal") {
+        return Some(SerialAction::ToggleCal);
     } else if trimmed.eq_ignore_ascii_case("help") {
         let _ = write!(
             tx,
-            "get\r\nset N\r\ninc\r\ndec\r\nhelp\r\n"
+            "get\r\nset N\r\ninc\r\ndec\r\ncal\r\nhelp\r\n"
         );
     } else if trimmed.len() >= 3
         && trimmed.as_bytes()[..3].eq_ignore_ascii_case(b"set")
@@ -33,6 +43,8 @@ pub fn handle_serial_command(line: &str, value: &mut i16, tx: &mut impl core::fm
     } else {
         let _ = write!(tx, "err\r\n");
     }
+
+    None
 }
 
 fn clamp_counter(value: i16) -> i16 {

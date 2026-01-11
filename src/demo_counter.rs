@@ -1,8 +1,8 @@
-use common::{BLACK_RGB565, HEIGHT, ORANGE_RGB565, WIDTH};
+use common::{BLACK_RGB565, GREEN_RGB565, HEIGHT, ORANGE_RGB565, WHITE_RGB565, WIDTH};
 
 use crate::render::{
-    draw_text_16x24, draw_triangle_down, draw_triangle_up, fill_rainbow, fill_rect,
-    fill_round_rect,
+    draw_crosshair, draw_text_16x24, draw_text_6x10, draw_triangle_down, draw_triangle_up,
+    fill_rainbow, fill_round_rect, fill_solid,
 };
 
 pub fn render_counter(framebuffer: &mut [u16], value: i16) {
@@ -81,6 +81,35 @@ pub fn render_counter(framebuffer: &mut [u16], value: i16) {
     draw_triangle_down(framebuffer, down_cx, down_cy, arrow_size, ORANGE_RGB565);
 }
 
+pub const CAL_POINT_COUNT: usize = 5;
+pub const CAL_POINTS: [(i32, i32); CAL_POINT_COUNT] = [
+    (20, 20),
+    (WIDTH as i32 - 1 - 20, HEIGHT as i32 - 1 - 20),
+    (20, HEIGHT as i32 - 1 - 20),
+    (WIDTH as i32 - 1 - 20, 20),
+    (WIDTH as i32 / 2, HEIGHT as i32 / 2),
+];
+
+pub fn render_calibration_screen(
+    framebuffer: &mut [u16],
+    point_index: usize,
+    touch: Option<(u16, u16)>,
+) {
+    fill_solid(framebuffer, BLACK_RGB565);
+    let size = 33;
+    let idx = point_index % CAL_POINTS.len();
+    let (tx, ty) = CAL_POINTS[idx];
+    draw_crosshair(framebuffer, tx, ty, size, WHITE_RGB565);
+
+    if let Some((x, y)) = touch {
+        draw_crosshair(framebuffer, x as i32, y as i32, 23, GREEN_RGB565);
+    }
+
+    let mut label_buf = [0u8; 12];
+    let label = format_label(idx + 1, CAL_POINTS.len(), &mut label_buf);
+    draw_text_6x10(framebuffer, 10, 10, label, ORANGE_RGB565);
+}
+
 fn format_i16(value: i16, out: &mut [u8; 6]) -> &str {
     let mut idx = 0usize;
     let mut val = value;
@@ -109,4 +138,40 @@ fn format_i16(value: i16, out: &mut [u8; 6]) -> &str {
     }
 
     core::str::from_utf8(&out[..idx]).unwrap_or("?")
+}
+
+fn format_label(current: usize, total: usize, out: &mut [u8; 12]) -> &str {
+    let mut idx = 0usize;
+    out[idx] = b'C';
+    idx += 1;
+    out[idx] = b'A';
+    idx += 1;
+    out[idx] = b'L';
+    idx += 1;
+    out[idx] = b' ';
+    idx += 1;
+    idx += write_usize(current, &mut out[idx..]);
+    out[idx] = b'/';
+    idx += 1;
+    idx += write_usize(total, &mut out[idx..]);
+    core::str::from_utf8(&out[..idx]).unwrap_or("CAL")
+}
+
+fn write_usize(mut value: usize, out: &mut [u8]) -> usize {
+    let mut buf = [0u8; 10];
+    let mut len = 0usize;
+    if value == 0 {
+        buf[0] = 0;
+        len = 1;
+    } else {
+        while value > 0 {
+            buf[len] = (value % 10) as u8;
+            len += 1;
+            value /= 10;
+        }
+    }
+    for i in (0..len).rev() {
+        out[len - 1 - i] = b'0' + buf[i];
+    }
+    len
 }

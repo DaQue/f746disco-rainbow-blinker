@@ -111,6 +111,9 @@ Tasks:
 Exit:
 - Touch indicator appears under finger reliably.
 
+Status:
+- DONE: `cal` mode steps through five targets and prints coords.
+
 ### Chunk 5 — Tap behavior (edge-detected)
 Goal: tap UP increments once; tap DOWN decrements once.
 Tasks:
