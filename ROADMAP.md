@@ -29,8 +29,8 @@
    - Fix: paste smaller chunks or edit directly in editor.
 
 ## Current expected behavior
-- Rainbow color bars across screen.
-- Shadowed magenta text ("HELLO / STM32F746").
+- Rainbow background with centered counter in a black bar.
+- Black-filled buttons below with orange outlines and ▲/▼.
 - Green LED blinking continuously.
 
 ## Notes / cleanup
@@ -86,11 +86,17 @@ Exit:
 - Screen shows centered value.
 - Serial `inc/dec/set` changes the on-screen number.
 
+Status:
+- DONE: counter renders centered and updates on serial changes.
+
 ### Step 4 — Draw buttons (still no touch)
 Goal: two buttons below counter with ▲ / ▼ (or UP/DN), looks presentable.
 
 Exit:
 - UI layout is correct and readable.
+
+Status:
+- DONE: buttons render with orange outlines and arrows.
 
 ### Step 5 — Touch visual debug
 Goal: draw a dot/crosshair under your finger; fix axis/inversion mapping.

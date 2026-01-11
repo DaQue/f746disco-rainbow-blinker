@@ -11,3 +11,4 @@ pub const MAGENTA_RGB565: u16 = 0xF81F;
 pub const RED_RGB565: u16 = 0xF800;
 pub const BLUE_RGB565: u16 = 0x001F;
 pub const BLACK_RGB565: u16 = 0x0000;
+pub const ORANGE_RGB565: u16 = 0xFD20;

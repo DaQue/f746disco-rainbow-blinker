@@ -4,7 +4,7 @@ Known-good LTDC + SDRAM framebuffer bring-up for the STM32F746G-DISCO, plus
 serial control over ST-LINK VCP.
 
 ## Status
-- Rainbow test pattern + shadowed text on LCD.
+- Rainbow background with counter UI (black bar, orange digits, black buttons with orange arrows).
 - LED heartbeat blinking.
 - Serial (ST-LINK VCP) TX/RX working with simple commands.
 

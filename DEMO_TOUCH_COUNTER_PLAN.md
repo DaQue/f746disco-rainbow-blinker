@@ -15,6 +15,7 @@ Baseline: LTDC+SDRAM+RGB565 framebuffer working; rainbow test; shadowed text; gr
 - We created a working branch:
   - `git checkout -b demo-touch-counter`
 - main.rs is ~389 lines. That’s the right time for a *surgical* refactor (extraction only).
+- Counter UI now renders: rainbow background, black bar with orange digits, black-filled buttons with orange outlines/arrows.
 
 ## Demo goal: "Touch Counter"
 UI:
@@ -66,6 +67,9 @@ Tasks:
 Exit:
 - Big centered 0 displayed, LED heartbeat still works.
 
+Status:
+- DONE.
+
 ### Chunk 2 — Increase font size (≈3×)
 Goal: counter is clearly larger but still crisp and centered.
 Tasks:
@@ -76,6 +80,9 @@ Tasks:
 
 Exit:
 - Large counter renders cleanly; fits screen.
+
+Status:
+- DONE (16x24 digits).
 
 ### Chunk 3 — Draw buttons (still no touch)
 Goal: two buttons below counter, aligned and readable.
@@ -89,6 +96,9 @@ Tasks:
 
 Exit:
 - UI looks like a real panel: big number + two buttons.
+
+Status:
+- DONE (black-filled buttons with orange outlines/arrows).
 
 ### Chunk 4 — Touch input visual debug (no state changes yet)
 Goal: confirm touch coordinates match LCD coordinates.

@@ -63,8 +63,8 @@ Repo: https://github.com/DaQue/f746disco-rainbow-blinker
 
 ## Current expected behavior
 
-- 🌈 Rainbow color bars across screen  
-- 💜 Shadowed magenta text (“HELLO / STM32F746”)  
+- 🌈 Rainbow background with centered counter in a black bar  
+- 🟧 Black-filled buttons with orange outlines and ▲/▼  
 - 💚 Green LED blinking continuously  
 
 ---
@@ -143,8 +143,8 @@ Use a project-local runner so `cargo run` flashes instead of trying to execute o
   then hand framebuffer to LTDC.
 
 ## Current Behavior (expected)
-- Rainbow color bars across screen
-- Shadowed magenta text visible and readable
+- Rainbow background with centered counter in a black bar
+- Black-filled buttons with orange outlines and ▲/▼
 - Green LED blinking continuously
 
 ## Notes / Cleanup (optional)

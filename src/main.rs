@@ -86,7 +86,7 @@ use crate::screen::Stm32F7DiscoDisplay;
     not(feature = "diag-bkpt")
 ))]
 use crate::{
-    render::{draw_text_6x10, fill_rainbow},
+    demo_counter::render_counter,
     serial_cmd::handle_serial_command,
     time::busy_delay_ms,
 };
@@ -115,13 +115,19 @@ mod serial_cmd;
     not(feature = "diag-bkpt")
 ))]
 mod time;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+mod demo_counter;
 
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
-use common::{BLACK_RGB565, FB_SIZE, MAGENTA_RGB565};
+use common::FB_SIZE;
 
 #[cfg(all(
     not(feature = "diag-led"),
@@ -282,15 +288,13 @@ fn main() -> ! {
     let mut display = Stm32F7DiscoDisplay::new(dp.LTDC, dp.DMA2D, &hse);
     let framebuffer = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
 
-    fill_rainbow(framebuffer);
+    let mut counter_value: i16 = 0;
+    let mut last_drawn: i16 = i16::MIN;
+    render_counter(framebuffer, counter_value);
+    last_drawn = counter_value;
 
     
 disp_on.set_high();
-
-draw_text_6x10(framebuffer, 21, 41, "HELLO", BLACK_RGB565);
-draw_text_6x10(framebuffer, 21, 61, "STM32F746", BLACK_RGB565);
-draw_text_6x10(framebuffer, 20, 40, "HELLO", MAGENTA_RGB565);
-draw_text_6x10(framebuffer, 20, 60, "STM32F746", MAGENTA_RGB565);
 
 display.controller.config_layer(Layer::L1, framebuffer, PixelFormat::RGB565);
 display.controller.enable_layer(Layer::L1);
@@ -301,7 +305,6 @@ display.controller.reload();
     let mut led_on = false;
     let mut half_sec_ticks: u32 = 0;
     let mut seconds: u32 = 0;
-    let mut counter_value: i16 = 0;
     let mut line_buf = [0u8; 64];
     let mut line_len: usize = 0;
     let mut rx_idle_ticks: u32 = 0;
@@ -338,6 +341,11 @@ display.controller.reload();
         }
 
         busy_delay_ms(cpu_hz, 1);
+        if counter_value != last_drawn {
+            let fb = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
+            render_counter(fb, counter_value);
+            last_drawn = counter_value;
+        }
         half_sec_ticks = half_sec_ticks.wrapping_add(1);
         rx_idle_ticks = rx_idle_ticks.wrapping_add(1);
         if half_sec_ticks % 500 == 0 {
@@ -348,7 +356,7 @@ display.controller.reload();
             }
             led_on = !led_on;
         }
-        if half_sec_ticks % 2000 == 0 && rx_idle_ticks >= 3000 {
+        if half_sec_ticks % 1000 == 0 && rx_idle_ticks >= 3000 {
             seconds = seconds.wrapping_add(1);
             let _ = write!(tx, "alive t={}\r\n", seconds);
         }
