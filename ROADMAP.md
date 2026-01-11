@@ -113,11 +113,17 @@ Goal: tap UP increments once; tap DOWN decrements once (no repeats yet).
 Exit:
 - Reliable single-step per tap.
 
+Status:
+- DONE: touch buttons update the counter.
+
 ### Step 7 — Hold auto-repeat + ramp
 Goal: press-and-hold repeats slowly, then ramps to a capped speed.
 
 Exit:
 - Feels good, not insane, clamps at ±999.
+
+Status:
+- DONE: hold repeat after delay at a steady rate.
 
 ## Planned refactor chunks (safe extraction order)
 1) Extract rendering helpers first (lowest risk): `src/render.rs`.

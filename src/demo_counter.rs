@@ -9,23 +9,23 @@ pub fn render_counter(framebuffer: &mut [u16], value: i16) {
     let mut buf = [0u8; 6];
     let s = format_i16(value, &mut buf);
     let len = s.len() as i32;
-    let btn_width = 140;
-    let btn_height = 60;
-    let btn_gap = 20;
-    let left_x = (WIDTH as i32 / 2) - btn_gap - btn_width;
-    let right_x = (WIDTH as i32 / 2) + btn_gap;
+    let layout = layout();
+    let left_x = layout.left_btn.x;
+    let right_x = layout.right_btn.x;
+    let btn_width = layout.left_btn.w;
+    let btn_height = layout.left_btn.h;
+    let btn_y = layout.left_btn.y;
 
     let text_width = len * 16 + (len - 1) * 2;
-    let text_height = 24;
+    let _text_height = 24;
 
     let box_pad_y = 12;
-    let box_w = right_x + btn_width - left_x;
-    let box_h = text_height + box_pad_y * 2;
-    let box_x = left_x;
-    let box_y = (HEIGHT as i32 - box_h) / 2;
+    let box_w = layout.box_rect.w;
+    let box_h = layout.box_rect.h;
+    let box_x = layout.box_rect.x;
+    let box_y = layout.box_rect.y;
     let text_x = (WIDTH as i32 - text_width) / 2;
     let text_y = box_y + box_pad_y;
-    let btn_y = box_y + box_h + 20;
 
     fill_rainbow(framebuffer);
     fill_round_rect(framebuffer, box_x, box_y, box_w, box_h, 12, BLACK_RGB565);
@@ -79,6 +79,75 @@ pub fn render_counter(framebuffer: &mut [u16], value: i16) {
     let down_cx = right_x + btn_width / 2;
     let down_cy = btn_y + btn_height / 2 - arrow_offset;
     draw_triangle_down(framebuffer, down_cx, down_cy, arrow_size, ORANGE_RGB565);
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum Button {
+    Up,
+    Down,
+}
+
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+pub struct Layout {
+    pub box_rect: Rect,
+    pub left_btn: Rect,
+    pub right_btn: Rect,
+}
+
+pub fn hit_test(x: i32, y: i32) -> Option<Button> {
+    let layout = layout();
+    if rect_contains(&layout.left_btn, x, y) {
+        return Some(Button::Down);
+    }
+    if rect_contains(&layout.right_btn, x, y) {
+        return Some(Button::Up);
+    }
+    None
+}
+
+fn layout() -> Layout {
+    let btn_width = 140;
+    let btn_height = 60;
+    let btn_gap = 20;
+    let left_x = (WIDTH as i32 / 2) - btn_gap - btn_width;
+    let right_x = (WIDTH as i32 / 2) + btn_gap;
+    let box_pad_y = 12;
+    let box_h = 24 + box_pad_y * 2;
+    let box_y = (HEIGHT as i32 - box_h) / 2;
+    let btn_y = box_y + box_h + 20;
+    let box_rect = Rect {
+        x: left_x,
+        y: box_y,
+        w: right_x + btn_width - left_x,
+        h: box_h,
+    };
+    let left_btn = Rect {
+        x: left_x,
+        y: btn_y,
+        w: btn_width,
+        h: btn_height,
+    };
+    let right_btn = Rect {
+        x: right_x,
+        y: btn_y,
+        w: btn_width,
+        h: btn_height,
+    };
+    Layout {
+        box_rect,
+        left_btn,
+        right_btn,
+    }
+}
+
+fn rect_contains(rect: &Rect, x: i32, y: i32) -> bool {
+    x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
 }
 
 pub const CAL_POINT_COUNT: usize = 5;

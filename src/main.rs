@@ -21,7 +21,6 @@ use stm32f7xx_hal as hal;
 use hal::{pac, prelude::*};
 
 #[cfg(feature = "diag-pins")]
-use cortex_m::asm::delay as busy_delay;
 #[cfg(feature = "diag-pins")]
 use cortex_m_rt::entry;
 #[cfg(feature = "diag-pins")]
@@ -46,7 +45,6 @@ use nb::Error as NbError;
     not(feature = "diag-pins"),
     not(feature = "diag-bkpt")
 ))]
-use cortex_m::asm::delay as busy_delay;
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
@@ -59,6 +57,12 @@ use cortex_m_rt::entry;
     not(feature = "diag-bkpt")
 ))]
 use stm32f7xx_hal as hal;
+#[cfg(all(
+    not(feature = "diag-led"),
+    not(feature = "diag-pins"),
+    not(feature = "diag-bkpt")
+))]
+use cortex_m::peripheral::DWT;
 #[cfg(all(
     not(feature = "diag-led"),
     not(feature = "diag-pins"),
@@ -86,7 +90,9 @@ use crate::screen::Stm32F7DiscoDisplay;
     not(feature = "diag-bkpt")
 ))]
 use crate::{
-    demo_counter::{render_calibration_screen, render_counter, CAL_POINT_COUNT, CAL_POINTS},
+    demo_counter::{
+        hit_test, render_calibration_screen, render_counter, Button, CAL_POINT_COUNT, CAL_POINTS,
+    },
     serial_cmd::{handle_serial_command, SerialAction},
     time::busy_delay_ms,
 };
@@ -217,7 +223,7 @@ fn main() -> ! {
 ))]
 #[entry]
 fn main() -> ! {
-    let cp = cortex_m::Peripherals::take().unwrap();
+    let mut cp = cortex_m::Peripherals::take().unwrap();
     let dp = pac::Peripherals::take().unwrap();
 
     let rcc = dp.RCC.constrain();
@@ -250,6 +256,12 @@ fn main() -> ! {
         _ => clocks.sysclk().raw(),
     };
     let _ = write!(tx, "clk sws={} hz={}\r\n", sws, cpu_hz);
+    cp.DCB.enable_trace();
+    DWT::unlock();
+    cp.DWT.enable_cycle_counter();
+    let cycles_per_ms = cpu_hz / 1000;
+    let mut last_cycle = DWT::cycle_count();
+    let mut cycle_remainder: u32 = 0;
     let _ = write!(tx, "boot ok\r\n");
 
     for _ in 0..10 {
@@ -330,6 +342,10 @@ fn main() -> ! {
     let mut last_touch: Option<(u16, u16)> = None;
     let mut cal_points: [Option<(u16, u16)>; CAL_POINT_COUNT] = [None; CAL_POINT_COUNT];
     let cal_tol: i32 = 30;
+    let mut btn_touch_down = false;
+    let mut held_button: Option<Button> = None;
+    let mut hold_ms: u32 = 0;
+    let mut repeat_ms: u32 = 0;
     render_counter(framebuffer, counter_value);
 
     
@@ -342,16 +358,17 @@ display.controller.reload();
 display.controller.reload();
  
     let mut led_on = false;
-    let mut half_sec_ticks: u32 = 0;
+    let mut led_ms: u32 = 0;
+    let mut alive_ms: u32 = 0;
     let mut seconds: u32 = 0;
     let mut line_buf = [0u8; 64];
     let mut line_len: usize = 0;
-    let mut rx_idle_ticks: u32 = 0;
+    let mut rx_idle_ms: u32 = 0;
     loop {
         loop {
             match rx.read() {
                 Ok(byte) => {
-                    rx_idle_ticks = 0;
+                    rx_idle_ms = 0;
                     if byte == b'\r' || byte == b'\n' {
                         if line_len > 0 {
                             if let Ok(line) = core::str::from_utf8(&line_buf[..line_len]) {
@@ -373,8 +390,10 @@ display.controller.reload();
                                                 cal_touch_down = false;
                                                 last_touch = None;
                                                 cal_points = [None; CAL_POINT_COUNT];
+                                                btn_touch_down = false;
                                                 render_calibration_screen(fb, cal_index, None);
                                             } else {
+                                                btn_touch_down = false;
                                                 render_counter(fb, counter_value);
                                             }
                                             last_drawn = counter_value;
@@ -404,11 +423,72 @@ display.controller.reload();
             }
         }
 
+        let now = DWT::cycle_count();
+        let delta = now.wrapping_sub(last_cycle);
+        last_cycle = now;
+        let total = cycle_remainder.wrapping_add(delta);
+        let elapsed_ms = total / cycles_per_ms;
+        cycle_remainder = total % cycles_per_ms;
         busy_delay_ms(cpu_hz, 1);
-        if !cal_mode && counter_value != last_drawn {
-            let fb = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
-            render_counter(fb, counter_value);
-            last_drawn = counter_value;
+        if !cal_mode {
+            let touch_now = touch.read_touch();
+            let is_down = touch_now.is_some();
+            let just_pressed = is_down && !btn_touch_down;
+            let current_button = touch_now.and_then(|(x, y)| hit_test(x as i32, y as i32));
+            if current_button != held_button {
+                held_button = current_button;
+                hold_ms = 0;
+                repeat_ms = 0;
+            }
+            if just_pressed {
+                if let Some(button) = current_button {
+                    match button {
+                        Button::Up => {
+                            if counter_value < 999 {
+                                counter_value += 1;
+                            }
+                        }
+                        Button::Down => {
+                            if counter_value > -999 {
+                                counter_value -= 1;
+                            }
+                        }
+                    }
+                }
+            }
+            if is_down {
+                hold_ms = hold_ms.wrapping_add(elapsed_ms);
+                if hold_ms >= 1333 {
+                    repeat_ms = repeat_ms.wrapping_add(elapsed_ms);
+                    if repeat_ms >= 250 {
+                        if let Some(button) = held_button {
+                            match button {
+                                Button::Up => {
+                                    if counter_value < 999 {
+                                        counter_value += 1;
+                                    }
+                                }
+                                Button::Down => {
+                                    if counter_value > -999 {
+                                        counter_value -= 1;
+                                    }
+                                }
+                            }
+                        }
+                        repeat_ms = 0;
+                    }
+                }
+            } else {
+                held_button = None;
+                hold_ms = 0;
+                repeat_ms = 0;
+            }
+            btn_touch_down = is_down;
+            if counter_value != last_drawn {
+                let fb = unsafe { &mut *core::ptr::addr_of_mut!(FB_LAYER1) };
+                render_counter(fb, counter_value);
+                last_drawn = counter_value;
+            }
         }
         if cal_mode {
             let touch_now = touch.read_touch();
@@ -477,9 +557,11 @@ display.controller.reload();
             cal_touch_down = is_down;
             last_touch = touch_now;
         }
-        half_sec_ticks = half_sec_ticks.wrapping_add(1);
-        rx_idle_ticks = rx_idle_ticks.wrapping_add(1);
-        if half_sec_ticks % 500 == 0 {
+        led_ms = led_ms.wrapping_add(elapsed_ms);
+        rx_idle_ms = rx_idle_ms.wrapping_add(elapsed_ms);
+        alive_ms = alive_ms.wrapping_add(elapsed_ms);
+        if led_ms >= 500 {
+            led_ms = led_ms.wrapping_sub(500);
             if led_on {
                 led.set_low();
             } else {
@@ -487,7 +569,8 @@ display.controller.reload();
             }
             led_on = !led_on;
         }
-        if !cal_mode && half_sec_ticks % 2000 == 0 && rx_idle_ticks >= 6000 {
+        if !cal_mode && alive_ms >= 1000 && rx_idle_ms >= 3000 {
+            alive_ms = alive_ms.wrapping_sub(1000);
             seconds = seconds.wrapping_add(1);
             let _ = write!(tx, "alive t={}\r\n", seconds);
         }

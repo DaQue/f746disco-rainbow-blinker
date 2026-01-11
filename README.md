@@ -8,6 +8,7 @@ serial control over ST-LINK VCP.
 - LED heartbeat blinking.
 - Serial (ST-LINK VCP) TX/RX working with simple commands.
 - Calibration mode (serial `cal`) shows a single crosshair target, prints touch coords, and exits after 5 points.
+- Touch buttons work: tap increments/decrements, hold repeats after a short delay.
 
 ## Build + flash
 - `cargo run --release`

@@ -127,6 +127,9 @@ Tasks:
 Exit:
 - Tap works reliably; no repeated steps while holding.
 
+Status:
+- DONE: touch buttons update the counter once per tap.
+
 ### Chunk 6 — Button press visual feedback (polish)
 Goal: button looks pressed while finger is down.
 Tasks:
@@ -152,6 +155,9 @@ Tasks:
 
 Exit:
 - Hold changes value at a controlled slow rate.
+
+Status:
+- DONE: hold repeats after delay at a steady rate.
 
 ### Chunk 8 — Ramp speed up with a cap (still reasonable)
 Goal: speed increases smoothly but never becomes insane.
